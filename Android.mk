@@ -6,6 +6,6 @@ LOCAL_SRC_FILES :=     \
         src/iniparser.c \
         src/dictionary.c \
 
-LOCAL_MODULE := iniparser
+LOCAL_MODULE := libiniparser
 
 include $(BUILD_STATIC_LIBRARY)

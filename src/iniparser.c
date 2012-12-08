@@ -26,7 +26,8 @@ typedef enum _line_status_ {
     LINE_EMPTY,
     LINE_COMMENT,
     LINE_SECTION,
-    LINE_VALUE
+    LINE_VALUE,
+    LINE_APPEND
 } line_status ;
 
 /*-------------------------------------------------------------------------*/
@@ -578,9 +579,9 @@ static line_status iniparser_line(
         strcpy(section, strstrip(section));
         strcpy(section, strlwc(section));
         sta = LINE_SECTION ;
-    } else if (sscanf (line, "%[^=] = \"%[^\"]\"", key, value) == 2
-           ||  sscanf (line, "%[^=] = '%[^\']'",   key, value) == 2
-           ||  sscanf (line, "%[^=] = %[^;#]",     key, value) == 2) {
+    } else if (sscanf (line, "%[^=+] = \"%[^\"]\"", key, value) == 2
+           ||  sscanf (line, "%[^=+] = '%[^\']'",   key, value) == 2
+           ||  sscanf (line, "%[^=+] = %[^;#]",     key, value) == 2) {
         /* Usual key=value, with or without comments */
         strcpy(key, strstrip(key));
         strcpy(key, strlwc(key));
@@ -593,6 +594,21 @@ static line_status iniparser_line(
             value[0]=0 ;
         }
         sta = LINE_VALUE ;
+    } else if (sscanf (line, "%[^=+] += \"%[^\"]\"", key, value) == 2
+           ||  sscanf (line, "%[^=+] += '%[^\']'",   key, value) == 2
+           ||  sscanf (line, "%[^=+] += %[^;#]",     key, value) == 2) {
+        /* Append to existing or empty value declaration */
+        strcpy(key, strstrip(key));
+        strcpy(key, strlwc(key));
+        strcpy(value, strstrip(value));
+        /*
+         * sscanf cannot handle '' or "" as empty values
+         * this is done here
+         */
+        if (!strcmp(value, "\"\"") || (!strcmp(value, "''"))) {
+            value[0]=0 ;
+        }
+        sta = LINE_APPEND ;
     } else if (sscanf(line, "%[^=] = %[;#]", key, value)==2
            ||  sscanf(line, "%[^=] %[=]", key, value) == 2) {
         /*
@@ -635,6 +651,8 @@ dictionary * iniparser_load(const char * ininame)
     char key     [ASCIILINESZ+1] ;
     char tmp     [ASCIILINESZ+1] ;
     char val     [ASCIILINESZ+1] ;
+    char tmpval  [ASCIILINESZ+1] ;
+    char * curval;
 
     int  last=0 ;
     int  len ;
@@ -699,8 +717,21 @@ dictionary * iniparser_load(const char * ininame)
             break ;
 
             case LINE_VALUE:
-            sprintf(tmp, "%s:%s", section, key);
+            snprintf(tmp, sizeof(tmp), "%s:%s", section, key);
             errs = dictionary_set(dict, tmp, val) ;
+            break ;
+
+            case LINE_APPEND:
+            snprintf(tmp, sizeof(tmp), "%s:%s", section, key) ;
+            if (!strlen(val))
+                break;
+            curval = dictionary_get(dict, tmp, NULL) ;
+            if (curval && strlen(curval)) {
+                snprintf(tmpval, sizeof(tmpval), "%s %s", curval, val) ;
+                errs = dictionary_set(dict, tmp, tmpval) ;
+            } else {
+                errs = dictionary_set(dict, tmp, val) ;
+            }
             break ;
 
             case LINE_ERROR:

@@ -332,6 +332,7 @@ char ** iniparser_getseckeys(dictionary * d, char * s)
     nkeys = iniparser_getsecnkeys(d, s);
 
     keys = (char**) malloc(nkeys*sizeof(char*));
+    if (NULL == keys) return keys;
 
     seclen  = (int)strlen(s);
     sprintf(keym, "%s:", s);
